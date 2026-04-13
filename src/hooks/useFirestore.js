@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     crearConfigCategoriasDefault,
@@ -1352,6 +1352,119 @@ export function useEliminarDescuento() {
 /**
  * Hook para editar un descuento existente
  */
+/**
+ * Hook para guardar/cargar/borrar la sesión de En Compra
+ * Ruta: sessions/encompra (documento único compartido, sin auth)
+ */
+export function useSesionEnCompra() {
+    const docRef = doc(db, 'sessions', 'encompra');
+
+    const guardarSesion = async (datos) => {
+        try {
+            await setDoc(docRef, { ...datos, actualizadoEn: new Date().toISOString() });
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const cargarSesion = async () => {
+        try {
+            const snap = await getDoc(docRef);
+            return snap.exists() ? snap.data() : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const borrarSesion = async () => {
+        try {
+            await deleteDoc(docRef);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    return { guardarSesion, cargarSesion, borrarSesion };
+}
+
+/**
+ * Hook para leer historial de compras finalizadas
+ * Estructura: compras_historial/lista
+ */
+export function useHistorialCompras() {
+    const [historial, setHistorial] = useState([]);
+    const [cargando, setCargando] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const historialRef = doc(db, 'compras_historial', 'lista');
+
+        const unsubscribe = onSnapshot(
+            historialRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setHistorial(docSnap.data().compras || []);
+                } else {
+                    setHistorial([]);
+                }
+                setCargando(false);
+            },
+            (err) => {
+                setError(err);
+                setCargando(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, []);
+
+    return { historial, cargando, error };
+}
+
+/**
+ * Hook para guardar una compra en historial
+ */
+export function useAgregarCompraHistorial() {
+    const [guardando, setGuardando] = useState(false);
+    const [error, setError] = useState(null);
+
+    const agregar = async (compra) => {
+        setGuardando(true);
+        setError(null);
+        try {
+            const historialRef = doc(db, 'compras_historial', 'lista');
+
+            const nuevaCompra = {
+                ...compra,
+                id: `compra_${Date.now()}`,
+                creadaEn: new Date().toISOString()
+            };
+
+            await runTransaction(db, async (tx) => {
+                const snap = await tx.get(historialRef);
+                const comprasActuales = snap.exists() ? (snap.data().compras || []) : [];
+                const comprasActualizadas = [nuevaCompra, ...comprasActuales].slice(0, 30);
+
+                tx.set(historialRef, {
+                    compras: comprasActualizadas,
+                    actualizadoEn: new Date().toISOString()
+                });
+            });
+
+            setGuardando(false);
+            return true;
+        } catch (err) {
+            setError(err);
+            setGuardando(false);
+            return false;
+        }
+    };
+
+    return { agregar, guardando, error };
+}
+
 export function useEditarDescuento() {
     const [guardando, setGuardando] = useState(false);
     const [error, setError] = useState(null);

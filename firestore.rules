@@ -54,6 +54,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Sesión de En Compra - acceso público
+    match /sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    // Historial de compras finalizadas
+    match /compras_historial/{docId} {
+      allow read, write: if true;
+    }
+    
     // ═══════════════════════════════════════════════════════════════
     // Denegar acceso a todo lo demás por defecto
     // ═══════════════════════════════════════════════════════════════

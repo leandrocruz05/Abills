@@ -7506,6 +7506,74 @@ hr {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.stats-card .mixta-grid {
+  overflow-x: auto;
+}
+
+.ultimas-compras-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.ultima-compra-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+
+.ultima-compra-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.ultima-super {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #c4b5fd;
+}
+
+.ultima-fecha {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-ver-compra {
+  margin-top: 0.5rem;
+  width: 100%;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.ultima-compra-lista {
+  margin-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 0.45rem;
+}
+
+.ultima-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.2rem 0;
+}
+
+.ultima-item-nombre {
+  color: white;
+  font-weight: 500;
 }
 
 .stats-card h3 {
@@ -8101,7 +8169,13 @@ hr {
 }
 
 .fila-oferta {
-  background: rgba(251, 191, 36, 0.04);
+  background: rgba(251, 191, 36, 0.14);
+  border-left: 3px solid rgba(251, 191, 36, 0.6);
+}
+
+.fila-no-comprado {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border-left: 3px solid rgba(239, 68, 68, 0.5) !important;
 }
 
 .fila-listo td {
@@ -8128,19 +8202,138 @@ hr {
   color: white;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
   white-space: normal;
 }
 
-.encompra-oferta-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0.15rem 0.4rem;
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
+.encompra-nombre-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.encompra-nombre-texto {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+}
+
+.encompra-marca-texto {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 400;
+}
+
+.btn-del-temporal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 4px;
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #f87171;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.btn-del-temporal:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.btn-agregar-temporal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px dashed rgba(139, 92, 246, 0.5);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-agregar-temporal:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.8);
+}
+
+.encompra-form-temporal {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+}
+
+.encompra-form-temporal h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: #a78bfa;
+}
+
+.encompra-form-temporal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.encompra-input-temporal {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.45rem 0.6rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.encompra-input-temporal.encompra-input-temporal-sm {
+  flex: 0 0 90px;
+  min-width: 0;
+}
+
+.encompra-input-temporal::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.encompra-form-temporal-btns {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.btn-finalizar-compra {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.7rem 1.4rem;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.btn-finalizar-compra:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.encompra-oferta-badge {
+  display: none;
 }
 
 .encompra-input {

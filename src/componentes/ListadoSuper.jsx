@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ShoppingCart, Package, BarChart3, TrendingDown, TrendingUp, Plus, Edit2, Trash2, Save, X, ArrowLeft, Settings, ShoppingBag } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { ShoppingCart, Package, BarChart3, TrendingDown, TrendingUp, Plus, Edit2, Trash2, Save, X, ArrowLeft, Settings, ShoppingBag, CheckCircle } from 'lucide-react';
 import { 
     useProductos, 
     useStock, 
@@ -12,7 +12,10 @@ import {
     useDescuentos,
     useAgregarDescuento,
     useEliminarDescuento,
-    useEditarDescuento
+    useEditarDescuento,
+    useSesionEnCompra,
+    useHistorialCompras,
+    useAgregarCompraHistorial
 } from '../hooks/useFirestore';
 
 function ListadoSuper() {
@@ -31,6 +34,8 @@ function ListadoSuper() {
     const { agregar: agregarDescuentoDB } = useAgregarDescuento();
     const { eliminar: eliminarDescuentoDB } = useEliminarDescuento();
     const { editar: editarDescuentoDB } = useEditarDescuento();
+    const { historial: historialCompras } = useHistorialCompras();
+    const { agregar: agregarCompraHistorial } = useAgregarCompraHistorial();
     
     const [mostrarModalProducto, setMostrarModalProducto] = useState(false);
     const [productoEditando, setProductoEditando] = useState(null);
@@ -184,6 +189,19 @@ function ListadoSuper() {
 
     const actualizarStockFirebase = async (productoId, cantidad) => {
         const nuevoStock = { ...stock, [productoId]: parseInt(cantidad) || 0 };
+        await actualizarStock(nuevoStock);
+    };
+
+    const aplicarCompraAStock = async (itemsComprados) => {
+        if (!itemsComprados || itemsComprados.length === 0) return;
+        const nuevoStock = { ...stock };
+
+        itemsComprados.forEach(({ id, cantidad }) => {
+            const actual = parseInt(nuevoStock[id]) || 0;
+            const comprada = parseInt(cantidad) || 0;
+            nuevoStock[id] = Math.max(0, actual + comprada);
+        });
+
         await actualizarStock(nuevoStock);
     };
 
@@ -460,6 +478,7 @@ function ListadoSuper() {
                     descuentos={descuentosPorDia}
                     descuentosDB={descuentosDB}
                     formatearMoneda={formatearMoneda}
+                    historialCompras={historialCompras}
                 />
             )}
 
@@ -471,6 +490,10 @@ function ListadoSuper() {
                     descuentos={descuentosPorDia}
                     descuentosDB={descuentosDB}
                     formatearMoneda={formatearMoneda}
+                    actualizarPrecios={actualizarPrecios}
+                    precios={precios}
+                    aplicarCompraAStock={aplicarCompraAStock}
+                    guardarCompraHistorial={agregarCompraHistorial}
                 />
             )}
 
@@ -963,7 +986,15 @@ function SeccionProductos({ productos, stock, actualizarStock, agregarProducto, 
 // SECCIÓN: ESTADÍSTICAS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function SeccionEstadisticas({ productosAComprar, totalesPorSuper, descuentos, descuentosDB, formatearMoneda }) {
+function SeccionEstadisticas({ productosAComprar, totalesPorSuper, descuentos, descuentosDB, formatearMoneda, historialCompras = [] }) {
+    const [compraExpandida, setCompraExpandida] = useState(null);
+    const historialOrdenado = useMemo(() => {
+        return [...historialCompras].sort((a, b) => {
+            const fechaA = new Date(a?.fecha || a?.creadaEn || 0).getTime();
+            const fechaB = new Date(b?.fecha || b?.creadaEn || 0).getTime();
+            return fechaB - fechaA;
+        });
+    }, [historialCompras]);
     const supermercados = [
         { key: 'coto', nombre: 'COTO' },
         { key: 'carrefour', nombre: 'CARREFOUR' },
@@ -1202,6 +1233,68 @@ function SeccionEstadisticas({ productosAComprar, totalesPorSuper, descuentos, d
                 Cálculos basados en los descuentos configurados en la sección DATOS
             </p>
 
+            <div className="stats-card">
+                <h3>Últimas Compras</h3>
+                <p className="stats-descripcion">Historial guardado al presionar Finalizar Compra</p>
+                <div className="ultimas-compras-grid">
+                    {historialOrdenado.length === 0 && (
+                        <div className="no-data-message"><p>Aún no hay compras finalizadas</p></div>
+                    )}
+                    {historialOrdenado.slice(0, 6).map((compra, idx) => {
+                        const compraId = compra.id || `hist_${idx}`;
+                        const fecha = (compra.fecha || compra.creadaEn) ? new Date(compra.fecha || compra.creadaEn) : null;
+                        const fechaTexto = fecha && !isNaN(fecha)
+                            ? fecha.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : '-';
+                        const expandida = compraExpandida === compraId;
+
+                        return (
+                            <div key={compraId} className="ultima-compra-card">
+                                <div className="ultima-compra-header">
+                                    <span className="ultima-super">{(compra.supermercado || '').toUpperCase()}</span>
+                                    <span className="ultima-fecha">{fechaTexto}</span>
+                                </div>
+                                <div className="opcion-details">
+                                    <div className="opcion-detail-item">
+                                        <span className="detail-label">Contado:</span>
+                                        <span className="detail-value">{formatearMoneda(compra.contado || 0)}</span>
+                                    </div>
+                                    <div className="opcion-detail-item">
+                                        <span className="detail-label">Descuento:</span>
+                                        <span className="detail-value" style={{ color: '#f87171' }}>-{formatearMoneda(compra.descuento || 0)}</span>
+                                    </div>
+                                    <div className="opcion-detail-item">
+                                        <span className="detail-label">Ahorro oferta:</span>
+                                        <span className="detail-value" style={{ color: '#60a5fa' }}>-{formatearMoneda(compra.ahorroOferta || 0)}</span>
+                                    </div>
+                                </div>
+                                <div className="opcion-total">
+                                    <span className="opcion-total-valor">{formatearMoneda(compra.total || 0)}</span>
+                                </div>
+                                <button
+                                    className="btn-ver-compra"
+                                    onClick={() => setCompraExpandida(expandida ? null : compraId)}
+                                >
+                                    {expandida ? 'Ocultar lista' : 'Ver lista'}
+                                </button>
+                                {expandida && (
+                                    <div className="ultima-compra-lista">
+                                        {(compra.items || []).map((item, idx) => (
+                                            <div key={`${compraId}_${idx}`} className="ultima-item-row">
+                                                <span className="ultima-item-nombre">{item.nombre}</span>
+                                                <span>x{item.cantidad}</span>
+                                                <span>{formatearMoneda(item.precioContado || 0)}</span>
+                                                <span>{formatearMoneda(item.precioOferta || 0)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* Mejor opción por supermercado */}
             <div className="stats-card">
                 <h3>Mejor Opción por Supermercado</h3>
@@ -1344,7 +1437,7 @@ function SeccionEstadisticas({ productosAComprar, totalesPorSuper, descuentos, d
 // SECCIÓN: EN COMPRA
 // ═══════════════════════════════════════════════════════════════════════════
 
-function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descuentosDB, formatearMoneda }) {
+function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descuentosDB, formatearMoneda, actualizarPrecios, precios, aplicarCompraAStock, guardarCompraHistorial }) {
     const supermercados = [
         { key: 'coto', nombre: 'COTO' },
         { key: 'carrefour', nombre: 'CARREFOUR' },
@@ -1353,8 +1446,40 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
     ];
 
     const [superSeleccionado, setSuperSeleccionado] = useState(null);
-    // Carrito local: { [productoId]: { cantidad, precio, tieneOferta } }
     const [carrito, setCarrito] = useState({});
+    // Productos temporales (solo para esta sesión de compra)
+    const [productosTemporales, setProductosTemporales] = useState([]);
+    const [mostrarFormTemporal, setMostrarFormTemporal] = useState(false);
+    const [nombreTemporal, setNombreTemporal] = useState('');
+    const [precioTemporal, setPrecioTemporal] = useState('');
+    const [cantidadTemporal, setCantidadTemporal] = useState('1');
+    const [marcaTemporal, setMarcaTemporal] = useState('');
+    const [resaltarNoComprados, setResaltarNoComprados] = useState(false);
+
+    const { guardarSesion, cargarSesion, borrarSesion } = useSesionEnCompra();
+    const sesionCargada = useRef(false);
+
+    // Cargar sesión al montar
+    useEffect(() => {
+        if (sesionCargada.current) return;
+        sesionCargada.current = true;
+        cargarSesion().then(sesion => {
+            if (sesion?.superSeleccionado) setSuperSeleccionado(sesion.superSeleccionado);
+            if (sesion?.carrito) setCarrito(sesion.carrito);
+            if (sesion?.productosTemporales) setProductosTemporales(sesion.productosTemporales);
+        });
+    }, []);
+
+    // Persistir en Firestore cada vez que cambia el carrito/super/temporales
+    const persistirRef = useRef(null);
+    useEffect(() => {
+        if (!sesionCargada.current) return;
+        if (persistirRef.current) clearTimeout(persistirRef.current);
+        persistirRef.current = setTimeout(() => {
+            guardarSesion({ superSeleccionado, carrito, productosTemporales });
+        }, 800);
+        return () => clearTimeout(persistirRef.current);
+    }, [superSeleccionado, carrito, productosTemporales]);
 
     const diasCapitalized = {
         lunes: 'Lunes', martes: 'Martes', miercoles: 'Miércoles',
@@ -1368,22 +1493,126 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
         maximumFractionDigits: 0
     }).format(monto || 0);
 
-    // Cuando se selecciona un supermercado, inicializar carrito con los productos y precios de ese super
+    // Cuando se selecciona un supermercado, inicializar carrito SOLO si no hay sesión guardada para ese super
     const seleccionarSuper = (superKey) => {
+        if (superSeleccionado === superKey) return; // ya estaba seleccionado
         setSuperSeleccionado(superKey);
         const nuevoCarrito = {};
         productosAComprar.forEach(prod => {
             const precio = prod.precios[superKey] || {};
             nuevoCarrito[prod.id] = {
                 nombre: prod.nombre,
+                marca: prod.precios[superKey]?.marca || '',
                 cantidad: prod.cantidadAComprar,
                 precio: precio.contado || 0,
                 precioOferta: precio.oferta || 0,
-                tieneOferta: !!precio.oferta,
                 listo: false
             };
         });
+        // Reinsertar temporales en el nuevo carrito
+        setProductosTemporales([]);
         setCarrito(nuevoCarrito);
+    };
+
+    const agregarProductoTemporal = () => {
+        if (!nombreTemporal.trim() || !precioTemporal) return;
+        const id = `temp_${Date.now()}`;
+        const nuevo = {
+            id,
+            nombre: nombreTemporal.trim(),
+            marca: marcaTemporal.trim(),
+            cantidad: parseInt(cantidadTemporal) || 1,
+            precio: parseFloat(precioTemporal) || 0,
+            precioOferta: 0,
+            listo: false,
+            temporal: true
+        };
+        setProductosTemporales(prev => [...prev, nuevo]);
+        setCarrito(prev => ({ ...prev, [id]: nuevo }));
+        setNombreTemporal('');
+        setPrecioTemporal('');
+        setCantidadTemporal('1');
+        setMarcaTemporal('');
+        setMostrarFormTemporal(false);
+    };
+
+    const eliminarProductoTemporal = (id) => {
+        setProductosTemporales(prev => prev.filter(p => p.id !== id));
+        setCarrito(prev => { const sig = { ...prev }; delete sig[id]; return sig; });
+    };
+
+    const finalizarCompra = async () => {
+        // Resaltar no comprados antes de confirmar
+        setResaltarNoComprados(true);
+        const noComprados = Object.values(carrito).filter(i => !i.listo && !i.temporal);
+        const msg = noComprados.length > 0
+            ? `Hay ${noComprados.length} producto(s) sin marcar (en rojo).\n¿Finalizar y actualizar precios de los comprados?`
+            : '¿Finalizar compra y actualizar precios en Firestore?';
+        if (!window.confirm(msg)) {
+            setResaltarNoComprados(false);
+            return;
+        }
+
+        const itemsComprados = Object.entries(carrito)
+            .filter(([, item]) => item.listo && !item.temporal)
+            .map(([id, item]) => ({ id, cantidad: item.cantidad }));
+
+        const detalleCompra = Object.entries(carrito)
+            .filter(([, item]) => item.listo)
+            .map(([id, item]) => ({
+                id,
+                nombre: item.nombre,
+                marca: item.marca || '',
+                cantidad: Number(item.cantidad) || 0,
+                precioContado: Number(item.precio) || 0,
+                precioOferta: Number(item.precioOferta) || 0,
+                subtotal: ((Number(item.precioOferta) || 0) > 0 ? Number(item.precioOferta) : Number(item.precio)) * (Number(item.cantidad) || 0)
+            }));
+
+        // Actualizar stock en PRODUCTOS según lo comprado
+        if (aplicarCompraAStock && itemsComprados.length > 0) {
+            await aplicarCompraAStock(itemsComprados);
+        }
+
+        // Actualizar precios solo de los items marcados como comprados (no temporales)
+        if (actualizarPrecios && superSeleccionado) {
+            for (const [id, item] of Object.entries(carrito)) {
+                if (!item.listo || item.temporal) continue;
+                const preciosActuales = precios?.[id] || {};
+                const preciosActualizados = {
+                    ...preciosActuales,
+                    [superSeleccionado]: {
+                        marca: item.marca || preciosActuales[superSeleccionado]?.marca || '',
+                        contado: item.precio || null,
+                        oferta: item.precioOferta || null
+                    }
+                };
+                await actualizarPrecios(id, preciosActualizados);
+            }
+        }
+
+        if (guardarCompraHistorial) {
+            const guardadoHistorialOk = await guardarCompraHistorial({
+                fecha: new Date().toISOString(),
+                supermercado: superSeleccionado,
+                contado: totalesCarrito.contado || 0,
+                descuento: totalesCarrito.descuento || 0,
+                ahorroOferta: totalesCarrito.ahorroOferta || 0,
+                total: totalesCarrito.conDesc || 0,
+                items: detalleCompra
+            });
+
+            if (!guardadoHistorialOk) {
+                alert('No se pudo guardar el historial de compra. No se limpió la compra actual para que no pierdas datos.');
+                return;
+            }
+        }
+
+        await borrarSesion();
+        setSuperSeleccionado(null);
+        setCarrito({});
+        setProductosTemporales([]);
+        setResaltarNoComprados(false);
     };
 
     // Mejor descuento disponible para el super seleccionado
@@ -1425,34 +1654,53 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
         return dias.map(d => diasCapitalized[d] || d).join(' o ');
     };
 
-    // Calcular totales en tiempo real desde el carrito
+    const itemsCarritoOrdenados = useMemo(() => {
+        return Object.entries(carrito).sort(([, a], [, b]) => {
+            const tempA = a.temporal ? 1 : 0;
+            const tempB = b.temporal ? 1 : 0;
+            if (tempA !== tempB) return tempA - tempB;
+            return (a.nombre || '').localeCompare((b.nombre || ''), 'es', { sensitivity: 'base' });
+        });
+    }, [carrito]);
+
+    // Calcular totales en tiempo real desde el carrito (solo items tildados)
     const totalesCarrito = useMemo(() => {
-        if (!superSeleccionado || Object.keys(carrito).length === 0) return { sinDesc: 0, descuento: 0, conDesc: 0 };
-        let totalContado = 0;
-        let totalOferta = 0;
+        if (!superSeleccionado || Object.keys(carrito).length === 0) return { sinDesc: 0, descuento: 0, conDesc: 0, oferta: 0, contado: 0 };
+        let totalContadoGeneral = 0;
+        let totalContadoDescontable = 0;
+        let totalOfertaPagada = 0;
+        let ahorroOferta = 0;
 
         Object.values(carrito).forEach(item => {
-            const usaOferta = (item.precioOferta || 0) > 0;
-            const precioUnitarioFinal = usaOferta ? item.precioOferta : item.precio;
-            const subtotal = precioUnitarioFinal * item.cantidad;
+            if (!item.listo) return;
+
+            const cantidad = Number(item.cantidad) || 0;
+            const precioContado = Number(item.precio) || 0;
+            const precioOferta = Number(item.precioOferta) || 0;
+            const usaOferta = precioOferta > 0;
+
+            totalContadoGeneral += precioContado * cantidad;
+
             if (usaOferta) {
-                totalOferta += subtotal;
+                totalOfertaPagada += precioOferta * cantidad;
+                ahorroOferta += (precioContado - precioOferta) * cantidad;
             } else {
-                totalContado += subtotal;
+                totalContadoDescontable += precioContado * cantidad;
             }
         });
 
         const porcentaje = mejorDescuentoInfo?.porcentaje || 0;
         const tope = mejorDescuentoInfo?.tope || null;
-        let descuentoCalculado = totalContado * (porcentaje / 100);
+        let descuentoCalculado = totalContadoDescontable * (porcentaje / 100);
         if (tope && descuentoCalculado > tope) descuentoCalculado = tope;
 
         return {
-            sinDesc: totalContado + totalOferta,
+            sinDesc: totalContadoGeneral,
             descuento: descuentoCalculado,
-            oferta: totalOferta,
-            contado: totalContado,
-            conDesc: totalContado - descuentoCalculado + totalOferta
+            oferta: totalOfertaPagada,
+            contado: totalContadoGeneral,
+            ahorroOferta: Math.max(0, ahorroOferta),
+            conDesc: totalContadoGeneral - Math.max(0, ahorroOferta) - descuentoCalculado
         };
     }, [carrito, superSeleccionado, mejorDescuentoInfo]);
 
@@ -1537,8 +1785,12 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                                 </tr>
                             </thead>
                             <tbody>
-                                {Object.entries(carrito).map(([id, item]) => (
-                                    <tr key={id} className={`${(item.precioOferta || 0) > 0 ? 'fila-oferta' : ''} ${item.listo ? 'fila-listo' : ''}`}>
+                                {itemsCarritoOrdenados.map(([id, item]) => (
+                                    <tr key={id} className={[
+                                        (item.precioOferta || 0) > 0 ? 'fila-oferta' : '',
+                                        item.listo ? 'fila-listo' : '',
+                                        resaltarNoComprados && !item.listo ? 'fila-no-comprado' : ''
+                                    ].filter(Boolean).join(' ')}>
                                         <td className="encompra-td-check">
                                             <input
                                                 type="checkbox"
@@ -1548,14 +1800,22 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                                             />
                                         </td>
                                         <td className="encompra-nombre">
-                                            {item.nombre}
-                                            {(item.precioOferta || 0) > 0 && <span className="encompra-oferta-badge">OFERTA</span>}
+                                            <div className="encompra-nombre-inner">
+                                                <span className="encompra-nombre-texto">{item.nombre}</span>
+                                                {item.marca && <span className="encompra-marca-texto">{item.marca}</span>}
+                                            </div>
+                                            {item.temporal && (
+                                                <button className="btn-del-temporal" onClick={() => eliminarProductoTemporal(id)} title="Quitar">
+                                                    <X size={12} />
+                                                </button>
+                                            )}
                                         </td>
                                         <td>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 value={item.cantidad}
+                                                onFocus={e => e.target.select()}
                                                 onChange={e => actualizarCantidad(id, e.target.value)}
                                                 className="encompra-input"
                                             />
@@ -1566,6 +1826,7 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                                                 min="0"
                                                 step="0.01"
                                                 value={item.precio}
+                                                onFocus={e => e.target.select()}
                                                 onChange={e => actualizarPrecio(id, e.target.value)}
                                                 className="encompra-input encompra-input-precio"
                                             />
@@ -1576,6 +1837,7 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                                                 min="0"
                                                 step="0.01"
                                                 value={item.precioOferta}
+                                                onFocus={e => e.target.select()}
                                                 onChange={e => actualizarPrecioOferta(id, e.target.value)}
                                                 className="encompra-input encompra-input-precio encompra-input-ofer"
                                             />
@@ -1587,7 +1849,60 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+
+                        {/* Botón agregar ítem ocasional - debajo del último producto */}
+                        {mostrarFormTemporal ? (
+                            <div className="encompra-form-temporal">
+                                <h4>Agregar ítem ocasional</h4>
+                                <div className="encompra-form-temporal-row">
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre del producto"
+                                        value={nombreTemporal}
+                                        onChange={e => setNombreTemporal(e.target.value)}
+                                        className="encompra-input-temporal"
+                                        autoFocus
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Marca (opcional)"
+                                        value={marcaTemporal}
+                                        onChange={e => setMarcaTemporal(e.target.value)}
+                                        className="encompra-input-temporal"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Cant."
+                                        value={cantidadTemporal}
+                                        min="1"
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => setCantidadTemporal(e.target.value)}
+                                        className="encompra-input-temporal encompra-input-temporal-sm"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Precio"
+                                        value={precioTemporal}
+                                        min="0"
+                                        step="0.01"
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => setPrecioTemporal(e.target.value)}
+                                        className="encompra-input-temporal encompra-input-temporal-sm"
+                                    />
+                                </div>
+                                <div className="encompra-form-temporal-btns">
+                                    <button className="btn-cancelar-tarea" onClick={() => setMostrarFormTemporal(false)}>Cancelar</button>
+                                    <button className="btn-guardar-tarea" onClick={agregarProductoTemporal}>
+                                        <Plus size={16} /> Agregar
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button className="btn-agregar-temporal" onClick={() => setMostrarFormTemporal(true)}>
+                                <Plus size={16} /> Agregar ítem ocasional
+                            </button>
+                        )}
+                    </div>{/* fin encompra-tabla-container */}
 
                     {/* Resumen total */}
                     <div className="encompra-resumen">
@@ -1623,6 +1938,11 @@ function SeccionEnCompra({ productosAComprar, totalesPorSuper, descuentos, descu
                         )}
                     </div>
                     </div>
+
+                    {/* Botón Finalizar Compra */}
+                    <button className="btn-finalizar-compra" onClick={finalizarCompra}>
+                        <CheckCircle size={18} /> Finalizar Compra
+                    </button>
                 </>
             )}
         </div>
