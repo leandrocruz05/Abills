@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, query, where, onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import {
     crearConfigCategoriasDefault,
@@ -1397,27 +1397,18 @@ export function useHistorialCompras() {
     const [historial, setHistorial] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState(null);
+    const storageKey = 'abills_compra_historial';
 
     useEffect(() => {
-        const historialRef = doc(db, 'compras_historial', 'lista');
-
-        const unsubscribe = onSnapshot(
-            historialRef,
-            (docSnap) => {
-                if (docSnap.exists()) {
-                    setHistorial(docSnap.data().compras || []);
-                } else {
-                    setHistorial([]);
-                }
-                setCargando(false);
-            },
-            (err) => {
-                setError(err);
-                setCargando(false);
-            }
-        );
-
-        return () => unsubscribe();
+        try {
+            const guardado = localStorage.getItem(storageKey);
+            const compras = guardado ? JSON.parse(guardado) : [];
+            setHistorial(Array.isArray(compras) ? compras : []);
+        } catch (err) {
+            setError(err);
+            setHistorial([]);
+        }
+        setCargando(false);
     }, []);
 
     return { historial, cargando, error };
@@ -1429,29 +1420,25 @@ export function useHistorialCompras() {
 export function useAgregarCompraHistorial() {
     const [guardando, setGuardando] = useState(false);
     const [error, setError] = useState(null);
+    const storageKey = 'abills_compra_historial';
 
     const agregar = async (compra) => {
         setGuardando(true);
         setError(null);
         try {
-            const historialRef = doc(db, 'compras_historial', 'lista');
-
+            const fechaActual = new Date().toISOString();
             const nuevaCompra = {
                 ...compra,
-                id: `compra_${Date.now()}`,
-                creadaEn: new Date().toISOString()
+                fecha: fechaActual,
+                creadaEn: fechaActual,
+                id: `compra_${Date.now()}`
             };
 
-            await runTransaction(db, async (tx) => {
-                const snap = await tx.get(historialRef);
-                const comprasActuales = snap.exists() ? (snap.data().compras || []) : [];
-                const comprasActualizadas = [nuevaCompra, ...comprasActuales].slice(0, 30);
+            const guardado = localStorage.getItem(storageKey);
+            const comprasActuales = guardado ? JSON.parse(guardado) : [];
+            const comprasActualizadas = [nuevaCompra, ...(Array.isArray(comprasActuales) ? comprasActuales : [])].slice(0, 30);
 
-                tx.set(historialRef, {
-                    compras: comprasActualizadas,
-                    actualizadoEn: new Date().toISOString()
-                });
-            });
+            localStorage.setItem(storageKey, JSON.stringify(comprasActualizadas));
 
             setGuardando(false);
             return true;

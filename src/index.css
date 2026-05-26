@@ -8455,9 +8455,22 @@ hr {
   font-weight: 400;
 }
 
+.modal-precio-cant-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.modal-precio-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
 .modal-precio-cantidad {
   display: inline-block;
-  margin-left: 0.6rem;
   padding: 0.1rem 0.55rem;
   background: rgba(139, 92, 246, 0.25);
   border: 1px solid rgba(139, 92, 246, 0.5);
@@ -8465,7 +8478,6 @@ hr {
   font-size: 0.85rem;
   font-weight: 600;
   color: #c4b5fd;
-  vertical-align: middle;
 }
 
 .precios-grid {
@@ -8482,14 +8494,58 @@ hr {
 }
 
 .precio-super-header {
-  padding: 0.5rem;
+  padding: 0.4rem 0.6rem;
   background: rgba(139, 92, 246, 0.2);
   color: #a78bfa;
   font-weight: 600;
   font-size: 0.85rem;
-  text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.btn-copiar-mayor-contado {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-copiar-mayor-contado:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: rgba(139, 92, 246, 0.6);
+  transform: translateY(-1px);
+}
+
+.btn-limpiar-super {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-limpiar-super:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
 }
 
 .precio-super-inputs {
