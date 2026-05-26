@@ -2026,6 +2026,8 @@ function ModalProducto({ producto, cerrar, guardar }) {
 }
 
 function ModalPrecio({ producto, precios, cerrar, guardar }) {
+    const supermercados = ['coto', 'carrefour', 'makro', 'dia'];
+
     const [datosPrecio, setDatosPrecio] = useState({
         coto: { 
             marca: precios.coto?.marca || '', 
@@ -2054,16 +2056,57 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
             ...datosPrecio,
             [superm]: {
                 ...datosPrecio[superm],
-                [campo]: campo === 'marca' ? valor : (valor ? parseFloat(valor) : null)
+                [campo]: campo === 'marca' ? valor : (valor ? parseFloat(String(valor).replace(',', '.')) : null)
             }
         });
+    };
+
+    const formatearCampoDecimal = (valor) => {
+        if (valor === null || valor === undefined || valor === '') return '';
+        return String(valor).replace('.', ',');
+    };
+
+    const esOriginal = (superm) => {
+        const marca = (datosPrecio[superm]?.marca || '').trim().toLowerCase().replace(/[()]/g, '').trim();
+        return marca !== '' && !supermercados.includes(marca);
+    };
+
+    const mejorFuenteParaCopiar = (superDestino) => {
+        let mejor = null;
+        supermercados.forEach(superOrigen => {
+            if (superOrigen === superDestino) return;
+            const precioOrigen = datosPrecio[superOrigen]?.contado;
+            if (!precioOrigen || Number(precioOrigen) <= 0) return;
+            if (!esOriginal(superOrigen)) return; // ignorar los que fueron auto-copiados
+            if (!mejor || Number(precioOrigen) > Number(mejor.contado)) {
+                mejor = { contado: precioOrigen, origen: superOrigen };
+            }
+        });
+        return mejor;
+    };
+
+    const limpiarTodo = () => {
+        const vacios = {};
+        supermercados.forEach(s => { vacios[s] = { marca: '', contado: '', oferta: '' }; });
+        setDatosPrecio(vacios);
+    };
+
+    const copiarDesdeOtroSuper = (superDestino) => {
+        const mejor = mejorFuenteParaCopiar(superDestino);
+        if (!mejor) return;
+        setDatosPrecio(prev => ({
+            ...prev,
+            [superDestino]: {
+                ...prev[superDestino],
+                contado: mejor.contado,
+                marca: `(${mejor.origen.toUpperCase()})`
+            }
+        }));
     };
 
     const manejarGuardar = () => {
         guardar(datosPrecio);
     };
-
-    const supermercados = ['coto', 'carrefour', 'makro', 'dia'];
 
     return (
         <>
@@ -2071,11 +2114,19 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
             <div className="modal-tarea modal-precio">
                 <div className="modal-tarea-header">
                     <div className="modal-precio-info">
-                        <h2>
+                        <h2 className="modal-precio-titulo">
                             {producto?.nombre}
                             {producto?.cantidadAComprar > 0 && (
                                 <span className="modal-precio-cantidad">Cant: {producto.cantidadAComprar}</span>
                             )}
+                            <button
+                                type="button"
+                                className="btn-limpiar-super"
+                                onClick={limpiarTodo}
+                                title="Limpiar todos los precios"
+                            >
+                                <Trash2 size={13} />
+                            </button>
                         </h2>
                         <p className="modal-precio-ean">EAN: {producto?.ean || 'Sin código'}</p>
                     </div>
@@ -2086,9 +2137,24 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
 
                 <div className="modal-tarea-contenido">
                     <div className="precios-grid">
-                        {supermercados.map(superm => (
+                        {supermercados.map(superm => {
+                            const sinPrecio = !datosPrecio[superm].contado || Number(datosPrecio[superm].contado) <= 0;
+                            const fuente = sinPrecio ? mejorFuenteParaCopiar(superm) : null;
+                            return (
                             <div key={superm} className="precio-super-card">
-                                <div className="precio-super-header">{superm.toUpperCase()}</div>
+                                <div className="precio-super-header">
+                                    <span>{superm.toUpperCase()}</span>
+                                    {fuente && (
+                                        <button
+                                            type="button"
+                                            className="btn-copiar-mayor-contado"
+                                            onClick={() => copiarDesdeOtroSuper(superm)}
+                                            title={`Copia precio de ${fuente.origen.toUpperCase()}`}
+                                        >
+                                            No hay
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="precio-super-inputs">
                                     <div className="precio-input-wrapper">
                                         <label>Marca</label>
@@ -2096,15 +2162,16 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
                                             type="text"
                                             value={datosPrecio[superm].marca || ''}
                                             onChange={(e) => actualizarPrecio(superm, 'marca', e.target.value)}
-                                            placeholder="Ej: NATURA 900 ML"
+                                            placeholder=""
                                             className="input-precio"
                                         />
                                     </div>
                                     <div className="precio-input-wrapper">
                                         <label>Contado</label>
                                         <input
-                                            type="number"
-                                            value={datosPrecio[superm].contado || ''}
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatearCampoDecimal(datosPrecio[superm].contado)}
                                             onChange={(e) => actualizarPrecio(superm, 'contado', e.target.value)}
                                             placeholder="0"
                                             className="input-precio"
@@ -2113,8 +2180,9 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
                                     <div className="precio-input-wrapper">
                                         <label>Oferta</label>
                                         <input
-                                            type="number"
-                                            value={datosPrecio[superm].oferta || ''}
+                                            type="text"
+                                            inputMode="decimal"
+                                            value={formatearCampoDecimal(datosPrecio[superm].oferta)}
                                             onChange={(e) => actualizarPrecio(superm, 'oferta', e.target.value)}
                                             placeholder="0"
                                             className="input-precio"
@@ -2122,7 +2190,8 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
