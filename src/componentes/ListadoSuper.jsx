@@ -2056,10 +2056,12 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
             ...datosPrecio,
             [superm]: {
                 ...datosPrecio[superm],
-                [campo]: campo === 'marca' ? valor : (valor ? parseFloat(String(valor).replace(',', '.')) : null)
+                [campo]: valor
             }
         });
     };
+
+    const toNum = (val) => parseFloat(String(val ?? '').replace(',', '.')) || 0;
 
     const formatearCampoDecimal = (valor) => {
         if (valor === null || valor === undefined || valor === '') return '';
@@ -2076,9 +2078,9 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
         supermercados.forEach(superOrigen => {
             if (superOrigen === superDestino) return;
             const precioOrigen = datosPrecio[superOrigen]?.contado;
-            if (!precioOrigen || Number(precioOrigen) <= 0) return;
+            if (!precioOrigen || toNum(precioOrigen) <= 0) return;
             if (!esOriginal(superOrigen)) return; // ignorar los que fueron auto-copiados
-            if (!mejor || Number(precioOrigen) > Number(mejor.contado)) {
+            if (!mejor || toNum(precioOrigen) > toNum(mejor.contado)) {
                 mejor = { contado: precioOrigen, origen: superOrigen };
             }
         });
@@ -2105,7 +2107,15 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
     };
 
     const manejarGuardar = () => {
-        guardar(datosPrecio);
+        const datosLimpios = {};
+        supermercados.forEach(s => {
+            datosLimpios[s] = {
+                marca: datosPrecio[s].marca || '',
+                contado: toNum(datosPrecio[s].contado) || null,
+                oferta: toNum(datosPrecio[s].oferta) || null,
+            };
+        });
+        guardar(datosLimpios);
     };
 
     return (
@@ -2138,7 +2148,7 @@ function ModalPrecio({ producto, precios, cerrar, guardar }) {
                 <div className="modal-tarea-contenido">
                     <div className="precios-grid">
                         {supermercados.map(superm => {
-                            const sinPrecio = !datosPrecio[superm].contado || Number(datosPrecio[superm].contado) <= 0;
+                            const sinPrecio = !datosPrecio[superm].contado || toNum(datosPrecio[superm].contado) <= 0;
                             const fuente = sinPrecio ? mejorFuenteParaCopiar(superm) : null;
                             return (
                             <div key={superm} className="precio-super-card">
